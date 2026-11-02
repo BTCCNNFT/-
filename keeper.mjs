@@ -18,6 +18,7 @@ const saleAbi = [
   "event Minted(address indexed user, uint256 tier, uint256 shares, uint256 lumenAmount)",
   "function vestedTotal(address) view returns (uint256)",
   "function vestedClaimed(address) view returns (uint256)",
+  "function totalMinted(address) view returns (uint256)",
 ];
 const rewardAbi = [
   "function owner() view returns (address)",
@@ -64,11 +65,13 @@ async function main() {
       const ev = sale.interface.parseLog(l);
       const a = ev.args.user.toLowerCase();
       tsCache[l.blockNumber] ??= (await p.getBlock(l.blockNumber)).timestamp;
-      const w = (state.wallets[a] ??= { minted: "0", first: tsCache[l.blockNumber] });
+      const w = (state.wallets[a] ??= { minted: "0", shares: 0, first: tsCache[l.blockNumber], fb: l.blockNumber, fi: l.index });
       w.minted = (BigInt(w.minted) + ev.args.lumenAmount).toString();
+      w.shares = (w.shares || 0) + Number(ev.args.shares);
     }
     state.lastBlock = to;
   }
+  for (const [a, w] of Object.entries(state.wallets)) w.shares = Number(await sale.totalMinted(a));
   console.log(`scanned to ${state.lastBlock}, ${Object.keys(state.wallets).length} minting wallets`);
 
   // 2. compute target brightness and push the ones that changed
